@@ -1,6 +1,6 @@
 # radius-server
 
-A high-performance, hardened RADIUS-over-TLS (RadSec) server built in Rust. Designed for zero-trust environments, it completely eliminates external cloud dependencies for secret management and fulfills the stringent security controls of **NIST SP 800-53, PCI DSS 4.0, NIST STIG, CIS, and ISO 27001**.
+A high-performance, hardened RADIUS-over-TLS (RadSec) server built in Rust. Designed for zero-trust environments, it atttempts to eliminate external dependencies for secret management while aligning with the aspirations of NIST SP 800-53, PCI DSS 4.0, NIST STIG, CIS, and ISO 27001.
 
 ## Security Architecture
 
