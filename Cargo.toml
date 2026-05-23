@@ -1,0 +1,20 @@
+[package]
+name = "radius-server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.36", features = ["full"] }
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "tls12"] }
+rustls-pemfile = "2.1"
+tokio-rustls = "0.26"
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+governor = "0.6"
+nonzero_ext = "0.3"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json"] }
+zeroize = "1.7"
+
+[dev-dependencies]
+tempfile = "3.10"
