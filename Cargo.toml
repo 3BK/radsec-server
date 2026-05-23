@@ -4,24 +4,34 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+# Async runtime & High-Performance Networking
 tokio = { version = "1.36", features = ["full"] }
+
+# TLS & Cryptography (FIPS & Post-Quantum ready via aws-lc-rs)
 rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "tls12"] }
 rustls-pemfile = "2.1"
 tokio-rustls = "0.26"
-serde = { version = "1.0", features = ["derive"] }
-toml = "0.8"
-governor = "0.6"
-nonzero_ext = "0.3"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["json"] }
 zeroize = "1.7"
 
+# Strict Configuration Management
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+
+# Volumetric Attack Prevention / Token-Bucket Rate Limiting[cite: 4, 5]
+governor = "0.6"
+nonzero_ext = "0.3"
+
+# Compliant JSONL Audit Logging Engine[cite: 4, 8]
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json"] }
+
 [dev-dependencies]
+# Ephemeral securely-permissioned environments for STIG/PCI validation testing[cite: 4, 5]
 tempfile = "3.10"
 
 [profile.release]
-strip = true          
-lto = true            
-panic = "abort"       
-opt-level = "z"       
-codegen-units = 1
+opt-level = 3           # Maximize performance optimizations (speed over binary size)
+lto = true              # Enable Link-Time Optimization across all crates
+codegen-units = 1       # Reduce parallel generation blocks to maximize LTO effectiveness
+panic = "abort"         # Strip stack unwinding code to reduce binary size and stop exploit pivoting
+strip = true            # Strictly strips all debug symbols and symbol tables from the final binary
