@@ -13,8 +13,9 @@ tokio = { version = "1.36", features = ["full"] }
 # TLS & Cryptography (FIPS & Post-Quantum ready via aws-lc-rs)
 rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "tls12"] }
 tokio-rustls = "0.26"
+
+# Memory hygiene / Cryptographic security
 zeroize = "1.7"
-# Removed rustls-pemfile = "2.1" and replaced with pem
 pem = "3.0"
 
 # Strict Configuration Management
