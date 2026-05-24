@@ -1,0 +1,31 @@
+[Unit]
+Description=Secure RadSec Server
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/radsec_server
+Environment="RADSEC_CONFIG=/etc/radsec/config.toml"
+Restart=on-failure
+
+# --- LEAST PRIVILEGE / STIG / PCI DSS 4.0 HARDENING ---
+# Run as a dedicated, non-root user
+User=radsec
+Group=radsec
+
+# File System Hardening
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/log/radsec/
+
+# Capability Dropping (Deny everything, not even port binding since 2083 is unprivileged)
+CapabilityBoundingSet=
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target
