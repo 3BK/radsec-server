@@ -19,7 +19,7 @@ pem = "3.0"
 
 # Strict Configuration Management
 serde = { version = "1.0", features = ["derive"] }
-toml = "1.1.2"
+toml = { version = ">=1.1.2", features = ["parse", "display"] }
 
 # Volumetric Attack Prevention / Token-Bucket Rate Limiting[cite: 4, 5]
 governor = "0.6"
