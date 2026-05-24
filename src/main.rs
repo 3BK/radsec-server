@@ -1,4 +1,4 @@
-use secure_radsec::{config, crypto, server};
+use radius-server::{config, crypto, server};
 use tracing::{info, Level};
 
 #[tokio::main]
