@@ -6,8 +6,8 @@ use tokio::net::TcpListener;
 use tokio::signal;
 use tokio_rustls::TlsAcceptor;
 use tracing::{error, info, warn};
-// Import the RADIUS server components
-use radius_server::server::RadiusServer;
+use radius_server::serve_async;
+use radius_server::dictionary::Dictionary;
 
 pub async fn run(cfg: ServerConfig, tls_config: rustls::ServerConfig) -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(&cfg.bind_address).await?;
