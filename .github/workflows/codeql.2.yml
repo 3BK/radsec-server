@@ -24,7 +24,7 @@ jobs:
           toolchain: "1.90.0"
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: rust
 
