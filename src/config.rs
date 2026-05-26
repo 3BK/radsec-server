@@ -1,166 +1,170 @@
-use crate::config::{PeerPolicyConfig, TlsConfig};
-use rustls::crypto::aws_lc_rs;
-use rustls::pki_types::{
-    CertificateDer, PrivateKeyDer, PrivatePkcs1KeyDer, PrivatePkcs8KeyDer, PrivateSec1KeyDer,
-};
-use rustls::server::WebPkiClientVerifier;
-use rustls::{RootCertStore, ServerConfig};
-use sha2::{Digest, Sha256};
+use serde::Deserialize;
 use std::fs;
-use std::sync::Arc;
-use x509_parser::extensions::GeneralName;
-use x509_parser::prelude::*;
-use zeroize::Zeroize;
+use std::os::unix::fs::PermissionsExt;
 
-#[derive(Debug, Clone)]
-pub struct PeerIdentity {
-    pub fingerprint_sha256_hex: String,
-    pub subject_cn: Option<String>,
-    pub san_uris: Vec<String>,
-    pub san_dns: Vec<String>,
+#[derive(Deserialize, Debug, Clone)]
+pub struct Config {
+    pub server: ServerConfig,
+    pub tls: TlsConfig,
+    pub peer_policy: PeerPolicyConfig,
+    pub radius: RadiusConfig,
+    pub upstream: UpstreamConfig,
+    pub eap: EapConfig,
+    pub control_plane: ControlPlaneConfig,
+    pub metrology: MetrologyConfig,
 }
 
-pub fn build_tls_config(
-    tls_cfg: &TlsConfig,
-) -> Result<ServerConfig, Box<dyn std::error::Error>> {
-    let mut ca_roots = RootCertStore::empty();
-
-    let ca_bytes = fs::read(&tls_cfg.client_ca_path)?;
-    for p in pem::parse_many(&ca_bytes)? {
-        if p.tag() == "CERTIFICATE" {
-            ca_roots.add(CertificateDer::from(p.contents().to_vec()))?;
-        }
-    }
-
-    let client_auth = WebPkiClientVerifier::builder(Arc::new(ca_roots)).build()?;
-
-    let mut provider = aws_lc_rs::default_provider();
-    provider.kx_groups = vec![aws_lc_rs::kx_group::SECP384R1];
-
-    let builder = ServerConfig::builder_with_provider(Arc::new(provider))
-        .with_protocol_versions(&[&rustls::version::TLS13])?
-        .with_client_cert_verifier(client_auth);
-
-    let cert_bytes = fs::read(&tls_cfg.server_cert_path)?;
-    let certs: Vec<CertificateDer<'static>> = pem::parse_many(&cert_bytes)?
-        .into_iter()
-        .filter(|p| p.tag() == "CERTIFICATE")
-        .map(|p| CertificateDer::from(p.contents().to_vec()))
-        .collect();
-
-    if certs.is_empty() {
-        return Err("No valid certificates found in server_cert_path".into());
-    }
-
-    let mut key_bytes = fs::read(&tls_cfg.private_key_path)?;
-    let key_pem = pem::parse(&key_bytes)?;
-    let key = match key_pem.tag() {
-        "PRIVATE KEY" => {
-            PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(key_pem.contents().to_vec()))
-        }
-        "RSA PRIVATE KEY" => {
-            PrivateKeyDer::Pkcs1(PrivatePkcs1KeyDer::from(key_pem.contents().to_vec()))
-        }
-        "EC PRIVATE KEY" => {
-            PrivateKeyDer::Sec1(PrivateSec1KeyDer::from(key_pem.contents().to_vec()))
-        }
-        _ => return Err(format!("Unsupported private key format: {}", key_pem.tag()).into()),
-    };
-    key_bytes.zeroize();
-
-    let mut server_config = builder.with_single_cert(certs, key)?;
-
-    if tls_cfg.require_alpn_radius {
-        server_config.alpn_protocols = vec![b"radius".to_vec()];
-    }
-
-    Ok(server_config)
+#[derive(Deserialize, Debug, Clone)]
+pub struct ServerConfig {
+    pub bind_address: String,
+    pub max_connections_per_sec: u32,
+    pub handshake_timeout_secs: u64,
+    pub io_timeout_secs: u64,
+    pub shutdown_grace_secs: u64,
 }
 
-pub fn extract_peer_identity(
-    cert_der: &CertificateDer<'_>,
-) -> Result<PeerIdentity, Box<dyn std::error::Error>> {
-    let mut hasher = Sha256::new();
-    hasher.update(cert_der.as_ref());
-    let fingerprint_sha256_hex = hex::encode(hasher.finalize());
-
-    let (_, cert) = X509Certificate::from_der(cert_der.as_ref())?;
-
-    let subject_cn = cert
-        .subject()
-        .iter_common_name()
-        .next()
-        .and_then(|cn| cn.as_str().ok())
-        .map(|s| s.to_string());
-
-    let mut san_uris = Vec::new();
-    let mut san_dns = Vec::new();
-
-    if let Ok(Some(san)) = cert.subject_alternative_name() {
-        for name in &san.value.general_names {
-            match name {
-                GeneralName::URI(uri) => san_uris.push(uri.to_string()),
-                GeneralName::DNSName(dns) => san_dns.push(dns.to_string()),
-                _ => {}
-            }
-        }
-    }
-
-    Ok(PeerIdentity {
-        fingerprint_sha256_hex,
-        subject_cn,
-        san_uris,
-        san_dns,
-    })
+#[derive(Deserialize, Debug, Clone)]
+pub struct TlsConfig {
+    pub client_ca_path: String,
+    pub server_cert_path: String,
+    pub private_key_path: String,
+    #[serde(default)]
+    pub require_alpn_radius: bool,
 }
 
-pub fn verify_peer_identity(
-    peer: &PeerIdentity,
-    policy: &PeerPolicyConfig,
-) -> Result<(), Box<dyn std::error::Error>> {
-    if !policy.allowed_sha256_fingerprints.is_empty() {
-        let allowed = policy
-            .allowed_sha256_fingerprints
-            .iter()
-            .any(|fp| fp.eq_ignore_ascii_case(&peer.fingerprint_sha256_hex));
-        if !allowed {
-            return Err(format!(
-                "Peer fingerprint {} is not in allowed set",
-                peer.fingerprint_sha256_hex
-            )
-            .into());
-        }
-    }
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct PeerPolicyConfig {
+    #[serde(default)]
+    pub allowed_sha256_fingerprints: Vec<String>,
 
-    if let Some(prefix) = &policy.require_san_uri_prefix {
-        let matched = peer.san_uris.iter().any(|u| u.starts_with(prefix));
-        if !matched {
-            return Err(format!(
-                "Peer SAN URI does not match required prefix '{}'",
-                prefix
-            )
-            .into());
-        }
-    }
+    pub require_san_uri_prefix: Option<String>,
+    pub require_san_dns_suffix: Option<String>,
 
-    if let Some(suffix) = &policy.require_san_dns_suffix {
-        let matched = peer.san_dns.iter().any(|d| d.ends_with(suffix));
-        if !matched {
-            return Err(format!(
-                "Peer SAN DNS does not match required suffix '{}'",
-                suffix
-            )
-            .into());
-        }
-    }
+    #[serde(default = "default_allow_subject_cn_fallback")]
+    pub allow_subject_cn_fallback: bool,
+}
 
-    if !policy.allow_subject_cn_fallback
-        && policy.require_san_uri_prefix.is_none()
-        && policy.require_san_dns_suffix.is_none()
-        && peer.san_uris.is_empty()
-        && peer.san_dns.is_empty()
-    {
-        return Err("Peer certificate has no SAN and CN fallback is disabled".into());
+fn default_allow_subject_cn_fallback() -> bool {
+    false
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct RadiusConfig {
+    #[serde(default = "default_radius_shared_secret")]
+    pub shared_secret: String,
+    #[serde(default = "default_require_message_authenticator")]
+    pub require_message_authenticator: bool,
+    #[serde(default = "default_max_packet_size")]
+    pub max_packet_size: usize,
+}
+
+fn default_radius_shared_secret() -> String {
+    "radsec".to_string()
+}
+
+fn default_require_message_authenticator() -> bool {
+    true
+}
+
+fn default_max_packet_size() -> usize {
+    4096
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct UpstreamConfig {
+    pub address: String,
+    pub timeout_secs: u64,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct EapConfig {
+    #[serde(default = "default_enforce_eap_tls_only")]
+    pub enforce_eap_tls_only: bool,
+}
+
+fn default_enforce_eap_tls_only() -> bool {
+    true
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct ControlPlaneConfig {
+    #[serde(default = "default_cp_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_cp_queue_capacity")]
+    pub queue_capacity: usize,
+    #[serde(default = "default_cp_shadow_queue_capacity")]
+    pub shadow_queue_capacity: usize,
+    #[serde(default = "default_cp_shadow_mode")]
+    pub shadow_mode: bool,
+    #[serde(default = "default_cp_allow_fault_injection")]
+    pub allow_fault_injection: bool,
+    #[serde(default = "default_cp_queue_drop_log_interval_secs")]
+    pub queue_drop_log_interval_secs: u64,
+}
+
+fn default_cp_enabled() -> bool {
+    true
+}
+
+fn default_cp_queue_capacity() -> usize {
+    4096
+}
+
+fn default_cp_shadow_queue_capacity() -> usize {
+    2048
+}
+
+fn default_cp_shadow_mode() -> bool {
+    true
+}
+
+fn default_cp_allow_fault_injection() -> bool {
+    false
+}
+
+fn default_cp_queue_drop_log_interval_secs() -> u64 {
+    60
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct MetrologyConfig {
+    #[serde(default = "default_metrics_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_metrics_queue_capacity")]
+    pub queue_capacity: usize,
+    #[serde(default = "default_metrics_flush_interval_secs")]
+    pub flush_interval_secs: u64,
+}
+
+fn default_metrics_enabled() -> bool {
+    true
+}
+
+fn default_metrics_queue_capacity() -> usize {
+    8192
+}
+
+fn default_metrics_flush_interval_secs() -> u64 {
+    30
+}
+
+pub fn load_config(path: &str) -> Result<Config, Box<dyn std::error::Error>> {
+    let config_str = fs::read_to_string(path)?;
+    let config: Config = toml::from_str(&config_str)?;
+    Ok(config)
+}
+
+/// Private keys must not be readable or writable by group/other.
+pub fn verify_file_permissions(path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let metadata = fs::metadata(path)?;
+    let mode = metadata.permissions().mode();
+
+    if mode & 0o077 != 0 {
+        return Err(format!(
+            "Insecure permissions ({:o}) on private key: {}. Must be 0600 or 0400.",
+            mode, path
+        )
+        .into());
     }
 
     Ok(())
