@@ -1,8 +1,46 @@
 [server]
 bind_address = "0.0.0.0:2083"
 max_connections_per_sec = 100
+handshake_timeout_secs = 10
+io_timeout_secs = 30
+shutdown_grace_secs = 10
 
 [tls]
 client_ca_path = "/etc/radsec/client_ca.pem"
 server_cert_path = "/etc/radsec/server.pem"
 private_key_path = "/etc/radsec/server.key"
+require_alpn_radius = false
+
+[peer_policy]
+allowed_sha256_fingerprints = []
+require_san_uri_prefix = null
+require_san_dns_suffix = null
+allow_subject_cn_fallback = false
+
+[radius]
+# Transparent proxy assumption: keep the same secret on both the edge and
+# the Kanidm backend unless you intentionally implement packet re-signing.
+shared_secret = "radsec"
+require_message_authenticator = true
+max_packet_size = 4096
+
+[upstream]
+# Kanidm native RADIUS backend
+address = "10.0.0.15:1812"
+timeout_secs = 5
+
+[eap]
+enforce_eap_tls_only = true
+
+[control_plane]
+enabled = true
+queue_capacity = 4096
+shadow_queue_capacity = 2048
+shadow_mode = true
+allow_fault_injection = false
+queue_drop_log_interval_secs = 60
+
+[metrology]
+enabled = true
+queue_capacity = 8192
+flush_interval_secs = 30
