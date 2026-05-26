@@ -1,4 +1,5 @@
-*** The following is EXPERIMENTAL *** 
+** The following is EXPERIMENTAL ** 
+** Use at your own risk. ** 
 
 # kanidm_radsec_edge
 
