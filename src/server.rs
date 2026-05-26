@@ -12,7 +12,6 @@ use crate::radius::{
 };
 use crate::state::{SessionState, SessionTracker};
 use governor::{Quota, RateLimiter};
-use sha2::{Digest, Sha256};
 use std::num::NonZeroU32;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
