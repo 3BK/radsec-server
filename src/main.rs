@@ -1,4 +1,4 @@
-use radsec_server::{config, crypto, server};
+use kanidm_radsec_edge::{config, crypto, server};
 use tracing::{info, Level};
 
 #[tokio::main]
