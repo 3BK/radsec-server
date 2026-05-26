@@ -11,7 +11,8 @@ radius-server = ">=0.2.3"
 tokio = { version = "1.36", features = ["full"] }
 
 # TLS & Cryptography (FIPS & Post-Quantum ready via aws-lc-rs)
-rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "tls12"] }
+#rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "tls12"] }
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs"] }
 tokio-rustls = "0.26"
 
 # Memory hygiene / Cryptographic security
