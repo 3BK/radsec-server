@@ -238,9 +238,9 @@ pub async fn run(
                                         kanidm_clone,
                                         peer_identity,
                                         tracker,
-                                        control_tx_clone,
-                                        shadow_tx_clone,
-                                        metrics_tx_clone,
+                                        control_tx_clone.clone(),
+                                        shadow_tx_clone.clone(),
+                                        metrics_tx_clone.clone(),
                                     ).await {
                                         Ok(_) => info!(
                                             action = "radius_session",
