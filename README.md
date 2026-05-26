@@ -1,3 +1,5 @@
+*** The following is EXPERIMENTAL *** 
+
 # kanidm_radsec_edge
 
 A hardened, production-oriented **RADIUS-over-TLS (RadSec) edge service** built in Rust for **EAP-TLS-only** environments and intended to front a **Kanidm-native RADIUS / EAP-TLS backend**.
